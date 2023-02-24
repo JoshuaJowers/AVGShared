@@ -62,6 +62,3 @@ class AerialImageDataset(Dataset):
         #sample = (image, xCoord, yCoord) Commented out until I know how to use the x and y coordinates
         return sample
 
-csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabelsmain.csv'
-root_dir = 'C:/Users/jower/miniconda3/envs/AVG/Images/jpgs'
-
