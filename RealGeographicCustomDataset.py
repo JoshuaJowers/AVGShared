@@ -44,6 +44,7 @@ class AerialImageDataset(Dataset):
 
         img_name = os.path.join(self.root_dir,
                                 self.image_data.iloc[idx, 0])
+
         image = io.imread(img_name)
 
 
@@ -59,6 +60,11 @@ class AerialImageDataset(Dataset):
         yCoord = labels[1]
         number = random.randint(0,1)
         sample = (image, number)
-        #sample = (image, xCoord, yCoord) Commented out until I know how to use the x and y coordinates
+        target = torch.tensor([xCoord, yCoord])
+        sample = (image, target)
+       # print("Target = " + str(target))
         return sample
+
+csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabelsmain.csv'
+root_dir = 'C:/Users/jower/miniconda3/envs/AVG/Images/jpgs'
 

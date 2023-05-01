@@ -9,6 +9,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from Main.RealGeographicCustomDataset import AerialImageDataset
 from torch.utils.data import random_split
 
+
+#Num Classes = 4 because independent normal distribution outputs st dev and mean for x and y locations
 #Defining depthwise separable layer to be using within the Xception architecture
 class depthwise_separable_conv(nn.Module):
     def __init__(self, nin, nout, kernel_size, padding, bias=False):
@@ -21,10 +23,11 @@ class depthwise_separable_conv(nn.Module):
         out = self.pointwise(out)
         return out
 
-#Main xception method, layers taken from xception diagram. Here is the documentation https://arxiv.org/abs/1610.02357
+# Main xception method, layers taken from xception diagram. Here is the documentation https://arxiv.org/abs/1610.02357
 # I have not messed with any of the input values for any of the layers
 class Xception(nn.Module):
-    def __init__(self, input_channel, num_classes=2):
+    #Num classes = 4 because of 2 mean and 2 standard deviations for bivariate independent normal distribution
+    def __init__(self, input_channel, num_classes=4):
         super(Xception, self).__init__()
 
         # Entry Flow
@@ -117,9 +120,10 @@ class Xception(nn.Module):
             nn.ReLU(True)
         )
 
-        self.linear = nn.Linear(2048, num_classes)
+        self.linear = nn.Linear(2048, 4)
 
     def forward(self, x):
+        batch_size = x.size(0)
         entry_out1 = self.entry_flow_1(x)
         entry_out2 = self.entry_flow_2(entry_out1) + self.entry_flow_2_residual(entry_out1)
         entry_out3 = self.entry_flow_3(entry_out2) + self.entry_flow_3_residual(entry_out2)
@@ -137,5 +141,8 @@ class Xception(nn.Module):
         exit_avg_pool_flat = exit_avg_pool.view(exit_avg_pool.size(0), -1)
 
         output = self.linear(exit_avg_pool_flat)
-
-        return output
+        mean_x = output[:, :1]
+        std_x = nn.functional.softplus(output[:, 2])  # Use softplus activation to ensure positive standard deviation
+        mean_y = output[:, 2:3]
+        std_y = nn.functional.softplus(output[:, 3])
+        return mean_x, std_x, mean_y, std_y
