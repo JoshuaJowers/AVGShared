@@ -13,7 +13,7 @@ from XceptionModel import Xception
 from math import sqrt
 
 # All of these number are currently arbitrary
-batch_size = 10
+batch_size = 5
 validation_ratio = 0.1
 random_seed = 10
 csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabelsmain.csv'
@@ -43,21 +43,48 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 import torch
 from torch.distributions import Normal
 
-def nll_loss(mean_x, std_x, mean_y, std_y, target):
-    dist_x = Normal(mean_x, std_x)
-    dist_y = Normal(mean_y, std_y)
-    diff_x = target[:, 0] - mean_x
-    diff_y = target[:, 1] - mean_y
-    loss = torch.sqrt(diff_x ** 2 + diff_y ** 2)
+import torch
+
+
+import torch
+
+def nll_loss(predictions, targets):
+    mean_x = predictions[:,0].clone().requires_grad_(True)
+    loss = torch.abs((targets[:, 0] - mean_x))
+    print(loss)
+    print(torch.mean(loss))
     return torch.mean(loss)
 
+def straight_line_loss(predictions, targets):
+    mean_x = predictions[:, 0].clone().requires_grad_(True)
+    mean_y = predictions[:, 2].clone().requires_grad_(True)
+    std_x = torch.abs(predictions[:, 1].clone().requires_grad_(True))
+    std_y = torch.abs(predictions[:, 3].clone().requires_grad_(True))
 
+    # Define normal distributions for x and y
+    dist_x = Normal(mean_x, std_x)
+    dist_y = Normal(mean_y, std_y)
+
+    # Reparameterization trick for sampling
+    epsilon_x = torch.randn_like(std_x)
+    epsilon_y = torch.randn_like(std_y)
+    pred_x = mean_x + std_x * epsilon_x
+    pred_y = mean_y + std_y * epsilon_y
+
+    target_x = targets[:, 0]
+    target_y = targets[:, 1]
+
+    loss_x = target_x - pred_x
+    loss_y = target_y - pred_y
+
+    squared_sum = torch.pow(loss_x, 2) + torch.pow(loss_y, 2)
+    loss = torch.sqrt(squared_sum).mean()
+    return loss
 
 # These are the classes defined for having it as a classification CNN
 classes = ('ADOP2006', 'ADOP2017')
-epochs = 100
+epochs = 50
 # Arbitrary
-initial_lr = 0.045
 
 net = Xception(3, 4)
 
@@ -66,7 +93,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net.to(device)
 # Defines Loss function and optimizer
 #criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 # Runs Training Loop
 i = 0
 for epoch in range(epochs):
@@ -77,28 +104,43 @@ for epoch in range(epochs):
     print(train_loader.__len__())
     for batch_idx, (images, targets) in enumerate(train_loader):
         # Zero the gradients
-        optimizer.zero_grad()
+
 
         # Forward pass
         output = net(images)
-        mean_x = output[0].clone().detach().requires_grad_(True)
-        std_x = output[1].clone().detach().requires_grad_(True)
-        mean_y = output[2].clone().detach().requires_grad_(True)
-        std_y = output[3].clone().detach().requires_grad_(True)
+        mean_x = output[0].clone().requires_grad_(True)
 
-        loss = nll_loss(mean_x.squeeze(), std_x.squeeze(), mean_y.squeeze(), std_y.squeeze(), targets)
+        #loss = nll_loss(mean_x.squeeze(), targets)
+        loss = straight_line_loss(output, targets)
+        # print("Targets 1 = ")
+        # print(targets)
+        # print("Targets = ")
+        # print(targets)
+        # print("Output = ")
+        # print(output)
+        #
+        # print("Loss = ")
+        # print(loss)
 
         # Backward pass and optimization
+        optimizer.zero_grad()
         loss.backward()
+        # for name, param in net.named_parameters():
+        #     if param.grad is not None:
+        #         print(f'{name}: {param.grad.norm()}')
+        #     else:
+        #         print(f'{name}: None')
+
         optimizer.step()
+
         running_loss += loss.item()
         if batch_idx % 20 == 19:  # Print every 20 batches
             print('[%d, %5d] loss: %.3f' %
                   (epoch + 1, batch_idx + 1, running_loss / 20))
             running_loss = 0.0
-            if epoch % 5 == 1:
-                print("Predicted X = " + str(mean_x))
-                print("Predicted Y = " + str(mean_y))
+            # if epoch % 5 == 1:
+            #     print("Predicted X = " + str(mean_x))
+            #     print("Predicted Y = " + str(mean_y))
 
     # Validation loop
     with torch.no_grad():
@@ -106,11 +148,7 @@ for epoch in range(epochs):
         val_loss = 0.0
         for images, targets in valid_loader:
             output = net(images)
-            mean_x = output[0].clone().detach().requires_grad_(True)
-            std_x = output[1].clone().detach().requires_grad_(True)
-            mean_y = output[2].clone().detach().requires_grad_(True)
-            std_y = output[3].clone().detach().requires_grad_(True)
-            loss = nll_loss(mean_x.squeeze(), std_x.squeeze(), mean_y.squeeze(), std_y.squeeze(), targets)
+            loss = straight_line_loss(output, targets)
             val_loss += loss.item()
 
         # Report validation loss
