@@ -23,7 +23,8 @@ def show_image(image):
 class AerialImageDataset(Dataset):
     #Init function takes in csv_file with headers filename, x, y, root_dir is the filepath to the folder containg the
     #images, transform is used to convert image to tensor
-    def __init__(self, csv_file, root_dir, transform=transforms.ToTensor()):
+    transforms = transforms.ToTensor()
+    def __init__(self, csv_file, root_dir, transform=transforms):
 
         self.image_data = pd.read_csv(csv_file)
         self.root_dir = root_dir
@@ -62,7 +63,6 @@ class AerialImageDataset(Dataset):
         sample = (image, number)
         target = torch.tensor([xCoord, yCoord])
         sample = (image, target)
-       # print("Target = " + str(target))
         return sample
 
 csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabelsmain.csv'

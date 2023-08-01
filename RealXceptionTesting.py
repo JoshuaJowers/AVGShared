@@ -16,7 +16,7 @@ from math import sqrt
 batch_size = 5
 validation_ratio = 0.1
 random_seed = 10
-csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabelsmain.csv'
+csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabels.csv'
 root_dir = 'C:/Users/jower/miniconda3/envs/AVG/Images/jpgs'
 full_dataset = AerialImageDataset(csv_file, root_dir)
 dataset_size = full_dataset.__len__()
@@ -81,9 +81,25 @@ def straight_line_loss(predictions, targets):
     loss = torch.sqrt(squared_sum).mean()
     return loss
 
+def nonsamplingxyloss(predictions, targets):
+    mean_x = predictions[:, 0].clone().requires_grad_(True)
+    mean_y = predictions[:, 2].clone().requires_grad_(True)
+    std_x = torch.abs(predictions[:, 1].clone().requires_grad_(True))
+    std_y = torch.abs(predictions[:, 3].clone().requires_grad_(True))
+
+    target_x = targets[:, 0]
+    target_y = targets[:, 1]
+
+    loss_x = target_x - mean_x
+    loss_y = target_y - mean_y
+
+    squared_sum = torch.pow(loss_x, 2) + torch.pow(loss_y, 2)
+    loss = torch.sqrt(squared_sum).mean()
+
+    return loss
 # These are the classes defined for having it as a classification CNN
 classes = ('ADOP2006', 'ADOP2017')
-epochs = 50
+epochs = 1000
 # Arbitrary
 
 net = Xception(3, 4)
@@ -111,7 +127,7 @@ for epoch in range(epochs):
         mean_x = output[0].clone().requires_grad_(True)
 
         #loss = nll_loss(mean_x.squeeze(), targets)
-        loss = straight_line_loss(output, targets)
+        loss = nonsamplingxyloss(output, targets)
         # print("Targets 1 = ")
         # print(targets)
         # print("Targets = ")
@@ -134,9 +150,9 @@ for epoch in range(epochs):
         optimizer.step()
 
         running_loss += loss.item()
-        if batch_idx % 20 == 19:  # Print every 20 batches
+        if batch_idx % 1300 == 1299:  # Print every 20 batches
             print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, batch_idx + 1, running_loss / 20))
+                  (epoch + 1, batch_idx + 1, running_loss / 1300))
             running_loss = 0.0
             # if epoch % 5 == 1:
             #     print("Predicted X = " + str(mean_x))
@@ -148,7 +164,7 @@ for epoch in range(epochs):
         val_loss = 0.0
         for images, targets in valid_loader:
             output = net(images)
-            loss = straight_line_loss(output, targets)
+            loss = nonsamplingxyloss(output, targets)
             val_loss += loss.item()
 
         # Report validation loss

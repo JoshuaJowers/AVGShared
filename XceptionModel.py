@@ -134,6 +134,18 @@ class Xception(nn.Module):
         for i in range(7):
             middle_out = self.middle_flow(middle_out) + middle_out
 
+        # exit_out1 = self.exit_flow_1(middle_out) + self.exit_flow_1_residual(middle_out)
+        # exit_out2 = self.exit_flow_2(exit_out1)
+        #
+        # exit_avg_pool = F.adaptive_avg_pool2d(exit_out2, (1, 1))
+        # exit_avg_pool_flat = exit_avg_pool.view(exit_avg_pool.size(0), -1)
+        #
+        # output = self.linear(exit_avg_pool_flat)
+        # mean_x = output[:, :1]
+        # std_x = nn.functional.softplus(output[:, 2])  # Use softplus activation to ensure positive standard deviation
+        # mean_y = output[:, 2:3]
+        # std_y = nn.functional.softplus(output[:, 3])
+        # return mean_x, std_x, mean_y, std_y
         exit_out1 = self.exit_flow_1(middle_out) + self.exit_flow_1_residual(middle_out)
         exit_out2 = self.exit_flow_2(exit_out1)
 
@@ -141,8 +153,4 @@ class Xception(nn.Module):
         exit_avg_pool_flat = exit_avg_pool.view(exit_avg_pool.size(0), -1)
 
         output = self.linear(exit_avg_pool_flat)
-        mean_x = output[:, :1]
-        std_x = nn.functional.softplus(output[:, 2])  # Use softplus activation to ensure positive standard deviation
-        mean_y = output[:, 2:3]
-        std_y = nn.functional.softplus(output[:, 3])
-        return mean_x, std_x, mean_y, std_y
+        return output
