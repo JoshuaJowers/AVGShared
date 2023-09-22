@@ -7,46 +7,22 @@ import numpy as np
 from torch.distributions import Normal
 from torch.utils import data as D
 from torch.utils.data.sampler import SubsetRandomSampler
-from Main.RealGeographicCustomDataset import AerialImageDataset
-from torch.utils.data import random_split
+from RealGeographicCustomDataset import AerialImageDataset
+from torch.utils.data import random_split, DataLoader
 from XceptionModel import Xception
 from math import sqrt
-
-# All of these number are currently arbitrary
-batch_size = 5
-validation_ratio = 0.1
-random_seed = 10
-csv_file = 'C:/Users/jower/miniconda3/envs/AVG/Images/multiplesourcelabels.csv'
-root_dir = 'C:/Users/jower/miniconda3/envs/AVG/Images/jpgs'
-full_dataset = AerialImageDataset(csv_file, root_dir)
-dataset_size = full_dataset.__len__()
-train_length = round(dataset_size / 2)
-valid_length = round(dataset_size / 4)
-print(dataset_size)
-test_length = dataset_size - train_length - valid_length
-
-# Splits dataset into 3 sets, with the training datset currently
-train_dataset, test_dataset, valid_dataset = random_split(full_dataset, [train_length, valid_length, test_length])
-# Instantiate loader objects to facilitate processing
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size,
-                                           shuffle=True)
-valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset,
-                                           batch_size=batch_size,
-                                           shuffle=True)
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=batch_size,
-                                          shuffle=True)
-
-#Change to RMSE
-# Loss function that takes in the means and standard deviations
-import torch
 from torch.distributions import Normal
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-import torch
 
+class CustomDatasetOnDevice(AerialImageDataset):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-import torch
+    def __getitem__(self, index):
+        image, target = super().__getitem__(index)
+        return image.to(device), target.to(device)
+
 
 def nll_loss(predictions, targets):
     mean_x = predictions[:,0].clone().requires_grad_(True)
@@ -97,14 +73,53 @@ def nonsamplingxyloss(predictions, targets):
     loss = torch.sqrt(squared_sum).mean()
 
     return loss
+# All of these number are currently arbitrary
+batch_size = 5
+validation_ratio = 0.1
+random_seed = 10
+import os
+
+# Get the current working directory
+current_directory = os.getcwd()
+
+# Define the path to the "Images" folder relative to the current directory
+image_folder = os.path.join(current_directory, "Images")
+
+# Specify the file name within the "Images" folder
+file_name = "multiplesourcelabels.csv"
+
+# Combine the folder path and file name to create the complete file path
+csv_file = os.path.join(image_folder, file_name)
+
+# Now, you can use the 'file_path' variable to access the file
+jpgs = "jpgs"
+root_dir = os.path.join(image_folder, jpgs)
+csv_file2 = 'C:/Users/jower/miniconda3.1/envs/pythonProject1/Images/multiplesourcelabels.csv'
+root_dir2 = 'C:/Users/jower/miniconda3.1/envs/pythonProject1/Images/jpgs'
+full_dataset = CustomDatasetOnDevice(csv_file, root_dir)
+dataset_size = full_dataset.__len__()
+train_length = round(dataset_size / 2)
+valid_length = round(dataset_size / 4)
+test_length = dataset_size - train_length - valid_length
+
+train_dataset, test_dataset, valid_dataset = random_split(full_dataset, [train_length, valid_length, test_length])
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+#Change to RMSE
+
+
 # These are the classes defined for having it as a classification CNN
 classes = ('ADOP2006', 'ADOP2017')
-epochs = 1000
+epochs = 10
 # Arbitrary
 
 net = Xception(3, 4)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+checkpoint_path = 'checkpoint3_epoch_10.pth'
+checkpoint = torch.load(checkpoint_path)
+net.load_state_dict(checkpoint)
 
 net.to(device)
 # Defines Loss function and optimizer
@@ -113,6 +128,12 @@ optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 # Runs Training Loop
 i = 0
 for epoch in range(epochs):
+    if (epoch + 1) % 5 == 0:
+        # Save the model's parameters
+        checkpoint_path = f'checkpoint3_epoch_{epoch + 1}.pth'
+        torch.save(net.state_dict(), checkpoint_path)
+        print(f'Saved checkpoint at epoch {epoch + 1} to {checkpoint_path}')
+
     running_loss = 0.0
     i = i + 1
     print("Epoch Number")
